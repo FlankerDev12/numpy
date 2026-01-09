@@ -2869,8 +2869,12 @@ arraydescr_setstate(_PyArray_LegacyDescr *self, PyObject *args)
     Py_ssize_t elsize = -1, alignment = -1;
     int version = 4;
     char endian;
-    PyObject *endian_obj;
-    PyObject *subarray, *fields, *names = NULL, *metadata=NULL;
+    PyObject *endian_obj = NULL;
+    PyObject *subarray = NULL;
+    PyObject *fields = NULL;
+    PyObject *names = NULL;
+    PyObject *metadata = NULL;
+
     int incref_names = 1;
     npy_int64 signed_dtypeflags = 0;
     npy_uint64 dtypeflags;
@@ -2884,11 +2888,25 @@ arraydescr_setstate(_PyArray_LegacyDescr *self, PyObject *args)
     if (self->fields == Py_None) {
         Py_RETURN_NONE;
     }
+
     if (PyTuple_GET_SIZE(args) != 1
-            || !(PyTuple_Check(PyTuple_GET_ITEM(args, 0)))) {
+        || !(PyTuple_Check(PyTuple_GET_ITEM(args, 0)))) {
         PyErr_BadInternalCall();
         return NULL;
     }
+
+    /* Reject malformed pickle state sizes early */
+    {
+        PyObject *state = PyTuple_GET_ITEM(args, 0);
+        Py_ssize_t n = PyTuple_GET_SIZE(state);
+
+        if (n < 5 || n > 9) {
+            PyErr_SetString(PyExc_ValueError,
+                            "invalid numpy.dtype pickle state");
+            return NULL;
+        }
+    }
+
     switch (PyTuple_GET_SIZE(PyTuple_GET_ITEM(args,0))) {
     case 9:
         if (!PyArg_ParseTuple(args, "(iOOOOnnkO):__setstate__",
